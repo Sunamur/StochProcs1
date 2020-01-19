@@ -227,9 +227,8 @@ dict_of_rates={
 }
 
 
-get_new_rub = lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0]
-get_new_usd = lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1]
-get_new_fx  = lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2]
+rub_alpha=1
+usd_alpha=1
 
 dict_of_getters={
     'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
@@ -266,7 +265,7 @@ simulations_number - parameter (for now = 1000)
 def stoch_wrapper(decomp):
     def make_stoch(num):
         sigma=[0.03, 0.0093, 0.11]
-        stoch_generator = np.dot(np.random.normal(size=(num,3)),decomp.values,)*sigma
+        stoch_generator = np.dot(np.random.normal(size=(num,3)),decomp)*sigma
         return stoch_generator
     return make_stoch
 
@@ -288,10 +287,47 @@ def make_large_step(
             dict_of_rates[instrument_kind][initial_timestep+i], 
             stoch[i])
         history.append(
-            ('usd',initial_timestep+i+1, history[-1][-1]+val_increment)
+            (instrument_kind,initial_timestep+i+1, history[-1][-1]+val_increment)
         )
     return history
 
+
+def dispatcher():
+    curve_usd, curve_rub, curve_fx, init = get_rates()
+
+    dict_of_rates={
+        'usd':curve_usd,
+        'rub':curve_rub,
+        'fx':curve_fx,
+    }
+    usd_alpha=1
+    rub_alpha=1
+
+    dict_of_getters={
+        'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
+        'usd':lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
+        'fx':lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
+
+    }
+    cp_count=5
+    ts_per_cp=5
+    sims = 10
+    history=[[('usd', 0, init[0]),('rub', 0, init[1]),('fx', 0, init[2]),]]
+    for large_step in range(cp_count):
+        local_history=[]
+        for instrument_kind in ['usd','rub','fx']:
+            start_values = np.random.choice(
+                [x[2] for x in history[-1] if x[0]==instrument_kind], size=sims
+                )
+            for init_value in start_values:
+                local_history.extend(
+                    make_large_step(
+                        instrument_kind,
+                        ts_per_cp, 
+                        init_value, 
+                        large_step*ts_per_cp))
+        history.append(local_history)
+    return history
 """
 todo:
 dispatcher for large steps
