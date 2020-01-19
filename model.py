@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import numpy.linalg as linalg
 import matplotlib.pyplot as plt
+
+from data_preparation import get_rates, get_decomp
 '''
 
 Техническое задание по групповому проекту - Дари:
@@ -179,11 +181,11 @@ def simulate_hull_white(
     return results
 
 
-from data_preparation import get_rates, get_decomp
-
 def main():
 
     curve_usd, curve_rub, curve_fx, init = get_rates()
+
+
     decomp=get_decomp()
     results = simulate_hull_white(
         curve_rub=curve_rub, 
@@ -209,19 +211,89 @@ def plot_results(result):
     plt.show()
 
 
-# sigma=[0.03, 0.0093, 0.11]
+sigma=[0.03, 0.0093, 0.11]
 
-# k_fx=0.015
-# dt=14/365
+k_fx=0.015
+dt=14/365
 
-# sim_number = 10
-# timesteps = 27
+sim_number = 10
+timesteps = 27
+curve_usd, curve_rub, curve_fx, init = get_rates()
 
-# get_new_rub = lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch
-# get_new_usd = lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch
-# get_new_fx  = lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch
+dict_of_rates={
+    'usd':curve_usd,
+    'rub':curve_rub,
+    'fx':curve_fx,
+}
 
 
+get_new_rub = lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0]
+get_new_usd = lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1]
+get_new_fx  = lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2]
+
+dict_of_getters={
+    'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
+    'usd':lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
+    'fx':lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
+
+}
 
 
 #id tuple:  rate_type, timestep, value
+
+
+# def calc_1_step(rate_type, timestep, value, stoch):
+#     if rate_type=='usd':
+#         getter = get_new_usd
+
+#     return getter(value, dict_of_rates[rate][timestep], stoch)
+
+
+
+"""
+mini_step = 2 weeks
+large_step - parameter (for now = 5 mini steps)
+num_steps - calculated parameter (how many large steps)
+simulations_number - parameter (for now = 1000)
+
+1. initialize rates.
+2. make sim_num simulations of large_step steps; save results
+3. bootstrap sim_num points from previous step, make simulations
+4. terminate when num_steps is reached
+
+"""
+
+def stoch_wrapper(decomp):
+    def make_stoch(num):
+        sigma=[0.03, 0.0093, 0.11]
+        stoch_generator = np.dot(np.random.normal(size=(num,3)),decomp.values,)*sigma
+        return stoch_generator
+    return make_stoch
+
+
+make_stoch = stoch_wrapper(get_decomp())
+
+
+def make_large_step(
+    instrument_kind,
+    ministeps, 
+    initial_value, 
+    initial_timestep):
+    history=[(instrument_kind, initial_timestep, initial_value)]
+    stoch = make_stoch(ministeps)
+    for i in range(ministeps):
+
+        val_increment = dict_of_getters[instrument_kind](
+            history[-1][-1], 
+            dict_of_rates[instrument_kind][initial_timestep+i], 
+            stoch[i])
+        history.append(
+            ('usd',initial_timestep+i+1, history[-1][-1]+val_increment)
+        )
+    return history
+
+"""
+todo:
+dispatcher for large steps
+    must initialize, collect results on each checkpoint, bootstrap last results for new large step
+"""
