@@ -24,36 +24,6 @@ df(r(t))) = (theta(t) - alpha(t)*r(t))*dt + sigma(t)*dW(t)
 
 '''
 
-def simulate_hull_white(frate, date):
-    mean_rev_lvl = frate
-    alpha=None
-    sigma=None
-
-
-
-def project():
-    do 1
-    do 2 
-    do 3
-
-
-def simulation(*args):
-    #do_simulation
-    #calculate
-    return result
-import pandas as pd
-
-
-payment_grafik_fix = pd.Series(zip(
-    index=pd.DatetimeIndex(),
-    data=payments_fix
-))
-
-payment_grafik_float = pd.Series(zip(
-    index=pd.DatetimeIndex(),
-    data=payments_float
-))
-
 
 
 
@@ -133,58 +103,11 @@ rub_irs_rate=[
     8.79850222938656
 ]
 
-
-rate_curve_hypothetical=pd.Series(...)
-#want to theck this hypothethis
-#we check it with simulation
 """
 Положим, мы провели интерполяцию, и на каждый таймстеп симуляции (которая меньше по периодам, чем оригинальные рейты) у нас есть теоретическое значение. его мы вставляем в качестве мин ревержна.
 для симуляций сигма постоянная
 """
 
-one_factor
-dr(t) = (theta(t) - alpha(t)*r(t))*dt + sigma(t) *dW(t)
-
-
-
-
-
-def simulate_hull_white(
-        curve_rub, 
-        curve_us, 
-        decomp,#decomposed matrix of covariation
-        init #init values for rub rate, usd rate, fx rate
-    ):
-    theta_fx=1
-    k_fx=1
-    rub_alpha=1
-    usd_alpha=1
-
-
-    dt=14/365
-    
-    sim_number = 1000
-    timesteps = 25
-    results = np.zeros(size=(timesteps, 3, sim_number))
-
-
-    for sim_ix in range(sim_number):
-        results[0,:,sim_ix] = init
-
-        stoch_generator = np.random.normal(scale=decomp, scale=(timesteps,3))
-        stoch_generator = decomp*stoch_generator
-        
-        for i, (rate_rub, rate_usd, stoch_tuple) in enumerate(zip(curve_rub,curve_us, stoch_generator)):
-            results[i+1,0,sim_ix] = results[i+1,0,sim_ix] + (rate_rub - rub_alpha*results[i,0,sim_ix])*dt+stoch_tuple[0]
-            results[i+1,1,sim_ix] = results[i+1,1,sim_ix] + (rate_usd - usd_alpha*results[i,1,sim_ix])*dt+stoch_tuple[1]
-            results[i+1,2,sim_ix] = results[i+1,2,sim_ix] + k_fx*(theta_fx - np.log(results[i,2,sim_ix]))*dt+stoch_tuple[2]
-
-    return results
-
-    
-#     dr(t) = k(theta(t) - alpha(t)*r(t))*dt + sigma(t) *dW(t)
-
-# dXt/Xt = k(theta-np.log(Xt))dt + sigma(t)dWt #fx rate 
 
 
 
@@ -196,16 +119,6 @@ def main():
     cov_matx = np.cov(risk_factory_history_1_year_diff)
     decomposed = linalg.cholesky(cov_matx)
 
-
-
-
-
-
-    hypothethical_curve = get_hypo_curve()#series of dates+values
-    hypothethical_curve = get_hypo_curve()#series of dates+values
-
-
-theta = mean_rev
 
 
 """
@@ -224,3 +137,52 @@ theta = mean_rev
 5. посчитали вар
 
 """
+
+
+
+
+
+def simulate_hull_white(
+    curve_rub, 
+    curve_us, 
+    curve_fx,
+    decomp,#decomposed matrix of covariation
+    init, #init values for rub rate, usd rate, fx rate
+    rub_alpha=1,
+    usd_alpha=1,
+
+    ):
+    sigma=[0.03, 0.0093, 0.11]
+
+    k_fx=0.015
+    dt=14/365
+    
+    sim_number = 10
+    timesteps = 27
+    results = np.zeros(shape=(timesteps, 3, sim_number))
+
+
+    for sim_ix in range(sim_number):
+        results[0,:,sim_ix] = init
+
+        stoch_generator = np.dot(np.random.normal(size=(timesteps,3)),decomp.values,)*sigma
+        
+        for i, (rate_rub, rate_usd, rate_fx, stoch_tuple) in enumerate(zip(curve_rub,curve_us,curve_fx, stoch_generator)):
+            results[i+1,0,sim_ix] = results[i,0,sim_ix] + (rate_rub - rub_alpha*results[i,0,sim_ix])*dt+stoch_tuple[0]
+            results[i+1,1,sim_ix] = results[i,1,sim_ix] + (rate_usd - usd_alpha*results[i,1,sim_ix])*dt+stoch_tuple[1]
+            results[i+1,2,sim_ix] = results[i,2,sim_ix] + k_fx*(rate_fx - np.log(results[i,2,sim_ix]))*dt+stoch_tuple[2]
+
+    return results
+
+
+
+
+
+get_new_rub = lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch
+get_new_usd = lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch
+get_new_fx  = lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch
+
+
+
+
+#id tuple:  rate_type, timestep, value
