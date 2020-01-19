@@ -233,7 +233,7 @@ usd_alpha=1
 dict_of_getters={
     'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
     'usd':lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
-    'fx':lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
+    'fx':lambda prev_state, rate_fx,  stoch:10# prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
 
 }
 
@@ -303,12 +303,12 @@ def dispatcher():
     usd_alpha=1
     rub_alpha=1
 
-    dict_of_getters={
-        'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
-        'usd':lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
-        'fx':lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
+    # dict_of_getters={
+    #     'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
+    #     'usd':lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
+    #     'fx':lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
 
-    }
+    # }
     cp_count=5
     ts_per_cp=5
     sims = 10
