@@ -112,22 +112,8 @@ rub_irs_rate=[
 """
 Положим, мы провели интерполяцию, и на каждый таймстеп симуляции (которая меньше по периодам, чем оригинальные рейты) у нас есть теоретическое значение. его мы вставляем в качестве мин ревержна.
 для симуляций сигма постоянная
-"""
 
 
-
-
-
-
-# def main():
-#     risk_factory_history_1_year = np.array()#shape - (27,3)
-#     risk_factory_history_1_year_diff=risk_factory_history_1_year.diff()
-#     cov_matx = np.cov(risk_factory_history_1_year_diff)
-#     decomposed = linalg.cholesky(cov_matx)
-
-
-
-"""
 1. матрица корреляций для риск-факторов (процентная ставка ру, us, обменный курс); ежеднеыные данные с maturity=3М
 матрица корреляций строится для приращений
 берем данные за год, изменение за 2 недели
@@ -231,9 +217,9 @@ rub_alpha=1
 usd_alpha=1
 
 dict_of_getters={
-    'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
-    'usd':lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
-    'fx':lambda prev_state, rate_fx,  stoch:10# prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
+    'rub':lambda prev_state, rate_rub, stoch:  (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
+    'usd':lambda prev_state, rate_usd, stoch:  (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
+    'fx':lambda prev_state, rate_fx,  stoch:   k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
 
 }
 
@@ -261,7 +247,7 @@ simulations_number - parameter (for now = 1000)
 4. terminate when num_steps is reached
 
 """
-
+instruments=['usd','rub','fx']
 def stoch_wrapper(decomp):
     def make_stoch(num):
         sigma=[0.03, 0.0093, 0.11]
@@ -274,25 +260,29 @@ make_stoch = stoch_wrapper(get_decomp())
 
 
 def make_large_step(
-    instrument_kind,
     ministeps, 
-    initial_value, 
+    initial_values, 
     initial_timestep):
-    history=[(instrument_kind, initial_timestep, initial_value)]
+    history=[]
     stoch = make_stoch(ministeps)
-    for i in range(ministeps):
+    for instr_ix in range(3):
+        instrument_kind = instruments[instr_ix]
+        instrument_history=[(instrument_kind, initial_timestep, initial_values[instr_ix])]
+        for i in range(ministeps):
 
-        val_increment = dict_of_getters[instrument_kind](
-            history[-1][-1], 
-            dict_of_rates[instrument_kind][initial_timestep+i], 
-            stoch[i])
-        history.append(
-            (instrument_kind,initial_timestep+i+1, history[-1][-1]+val_increment)
-        )
+            val_increment = dict_of_getters[instrument_kind](
+                instrument_history[-1][-1], 
+                dict_of_rates[instrument_kind][initial_timestep+i], 
+                stoch[i])
+            instrument_history.append(
+                (instrument_kind,initial_timestep+i+1, instrument_history[-1][-1]+val_increment)
+            )
+        history.extend(instrument_history)
+
     return history
 
 
-def dispatcher():
+def dispatcher(sims=1000):
     curve_usd, curve_rub, curve_fx, init = get_rates()
 
     dict_of_rates={
@@ -303,29 +293,29 @@ def dispatcher():
     usd_alpha=1
     rub_alpha=1
 
-    # dict_of_getters={
-    #     'rub':lambda prev_state, rate_rub, stoch: prev_state + (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
-    #     'usd':lambda prev_state, rate_usd, stoch: prev_state + (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
-    #     'fx':lambda prev_state, rate_fx,  stoch: prev_state + k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
 
-    # }
     cp_count=5
     ts_per_cp=5
-    sims = 10
-    history=[[('usd', 0, init[0]),('rub', 0, init[1]),('fx', 0, init[2]),]]
+    
+    history=[[('usd', 0, init[0],'null'),('rub', 0, init[1],'null'),('fx', 0, init[2],'null'),]]
     for large_step in range(cp_count):
         local_history=[]
-        for instrument_kind in ['usd','rub','fx']:
-            start_values = np.random.choice(
-                [x[2] for x in history[-1] if x[0]==instrument_kind], size=sims
-                )
-            for init_value in start_values:
-                local_history.extend(
-                    make_large_step(
-                        instrument_kind,
-                        ts_per_cp, 
-                        init_value, 
-                        large_step*ts_per_cp))
+        # for instrument_kind in ['usd','rub','fx']:
+
+        """
+        we urgently need to introduce simulation index, by which we will bootstrap start values
+        we also need to add ix appending to make_large_step
+        
+        """
+        start_values = np.random.choice([x[2] for x in history[-1] if x[0]==instrument_kind], size=sims
+            )
+        for init_value in start_values:
+            local_history.extend(
+                make_large_step(
+                    instrument_kind,
+                    ts_per_cp, 
+                    init_value, 
+                    large_step*ts_per_cp))
         history.append(local_history)
     return history
 """
