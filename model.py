@@ -3,7 +3,7 @@ import pandas as pd
 import numpy.linalg as linalg
 import matplotlib.pyplot as plt
 
-from data_preparation import get_rates, get_decomp
+from data_preparation import get_rates, get_decomp, get_actual_rates
 
 
 instruments=['usd','rub','fx']
@@ -17,53 +17,60 @@ def stoch_wrapper(decomp):
 
 stoch_generator = stoch_wrapper(get_decomp())
 
-def simulate_hull_white(
-    curve_rub, 
-    curve_usd, 
-    curve_fx,
-    decomp,#decomposed matrix of covariation
-    init, #init values for rub rate, usd rate, fx rate
-    rub_alpha=1,
-    usd_alpha=1,
-    sim_number = 10,
-    ):
-    sigma=[0.03, 0.0093, 0.11]
+"""
 
+Идея из чата.
+
+theta(t) = Ft(0,t)+a*F(0,t)+(sigma^2)/2a * (1-exp(-2at))
+
+dXt/Xt = k*(theta - ln Xt)*dt + sigma_fx(t)*dWt
+"""
+
+
+
+def simulate_hull_white(
+    sim_number = 10,):
+    rub_alpha=1
+    usd_alpha=1
+    sigma=[0.03, 0.0093, 0.011]
     k_fx=0.015
     dt=14/365
-    
+    timesteps = 26
+    results = np.zeros(shape=(timesteps+1, 3, sim_number))
 
-    timesteps = 27
-    results = np.zeros(shape=(timesteps, 3, sim_number))
+    passed_time=0
 
+    curve_usd_df, curve_rub_df, curve_fx_df, _ = get_rates()
+    curve_usd, curve_rub, curve_fx, init = get_actual_rates()
 
     for sim_ix in range(sim_number):
         results[0,:,sim_ix] = init
+        stochs = stoch_generator(timesteps+1)
+        for i, (rate_rub, rate_usd, rate_fx,df_rub, df_usd,df_fx, stoch_tuple) in enumerate(zip(curve_rub,curve_usd,curve_fx,curve_rub_df,curve_usd_df, curve_fx_df, stochs)):
+            passed_time+=dt
 
-        stochs = stoch_generator(timesteps)
-        for i, (rate_rub, rate_usd, rate_fx, stoch_tuple) in enumerate(zip(curve_rub,curve_usd,curve_fx, stochs)):
-            results[i+1,0,sim_ix] = results[i,0,sim_ix] + (rate_rub - rub_alpha*results[i,0,sim_ix])*dt+stoch_tuple[0]
-            results[i+1,1,sim_ix] = results[i,1,sim_ix] + (rate_usd - usd_alpha*results[i,1,sim_ix])*dt+stoch_tuple[1]
+            theta_rub = df_rub + rub_alpha*rate_rub + (sigma[0]**2)*(1-np.exp(-2*rub_alpha*passed_time))/2*rub_alpha
+            theta_usd = df_usd + usd_alpha*rate_usd + (sigma[1]**2)*(1-np.exp(-2*usd_alpha*passed_time))/2*usd_alpha
+
+            results[i+1,0,sim_ix] = results[i,0,sim_ix] + (theta_rub - rub_alpha*results[i,0,sim_ix])*dt+stoch_tuple[0]
+            results[i+1,1,sim_ix] = results[i,1,sim_ix] + (theta_usd - usd_alpha*results[i,1,sim_ix])*dt+stoch_tuple[1]
             results[i+1,2,sim_ix] = results[i,2,sim_ix] + k_fx*(rate_fx - np.log(results[i,2,sim_ix]))*dt+stoch_tuple[2]
-
     return results
 
 
-def main():
+def perform_simulations_basic_mode(rub_alpha, usd_alpha):
 
-    curve_usd, curve_rub, curve_fx, init = get_rates()
+    # curve_usd, curve_rub, curve_fx, init = get_rates()
+    curve_usd, curve_rub, curve_fx, init = get_actual_rates()
 
-
-    decomp=get_decomp()
     results = simulate_hull_white(
         curve_rub=curve_rub, 
         curve_usd=curve_usd, 
         curve_fx=curve_fx,
-        decomp=decomp,
         init=init,
-        rub_alpha=1,
-        usd_alpha=1,
-        sim_number=10
+        rub_alpha=rub_alpha,
+        usd_alpha=usd_alpha,
+        sim_number=1000
         )
     # results - np array of shape(no of timesteps, no of instruments, no of simulations)
     plot_results(results)
@@ -74,7 +81,7 @@ def plot_results(result):
     titles=['Процентная ставка в рублях', "Процентная ставка в доларах", "Обменный курс"]
     for i in range(3):
         ax[i].plot(result[:,i,:], alpha=0.1)
-        pd.DataFrame(result[:,i,:].T).quantile(0.05).plot(ax=ax[i])
+        pd.DataFrame(result[:,i,:].T).quantile(0.2).plot(ax=ax[i])
         ax[i].set_title(titles[i]+ ' (VaR 5%)')
     plt.show()
 
