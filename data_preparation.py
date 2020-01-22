@@ -73,8 +73,12 @@ def get_rates():
     return  curve_us, curve_rub, curve_fx, df_rub_usd_int.iloc[0,1:].values
 
 
-
-
+def get_actual_rates():
+    curve_usd, curve_rub, curve_fx, init = get_rates()
+    curve_usd_act = curve_usd.cumsum()+init[0]
+    curve_rub_act = curve_rub.cumsum()+init[1]
+    curve_fx_act  = curve_fx.cumsum() +init[2]
+    return curve_usd_act, curve_rub_act, curve_fx_act, init
 
 
 
