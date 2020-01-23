@@ -89,13 +89,21 @@ def perform_simulations_basic_mode(sim_number=1000):
     plot_results(results)
     return results
 
-def plot_results(result):
+def plot_results(result, show_diffs=True):
     fig,ax = plt.subplots(1,3,figsize=(25,5))
-    titles=['Процентная ставка в рублях', "Процентная ставка в доларах", "Обменный курс"]
-    for i in range(3):
-        ax[i].plot(result[:,i,:], alpha=0.1)
-        pd.DataFrame(result[:,i,:].T).quantile(0.2).plot(ax=ax[i])
-        ax[i].set_title(titles[i]+ ' (VaR 5%)')
+    if show_diffs:
+        titles=['Процентная ставка в рублях, приращения', "Процентная ставка в доларах, приращения", "Обменный курс, приращения"]
+        for i in range(3):
+            ax[i].plot(result[1:,i,:], alpha=0.1)
+            pd.DataFrame(result[1:,i,:].T).quantile(0.05).plot(ax=ax[i])
+            ax[i].set_title(titles[i]+ ' (VaR 5%)')
+    else:
+        titles=['Процентная ставка в рублях', "Процентная ставка в доларах", "Обменный курс"]
+        for i in range(3):
+            ax[i].plot(result[:,i,:].cumsum(axis=0), alpha=0.1)
+            pd.DataFrame(result[:,i,:].cumsum(axis=0).T).quantile(0.05).plot(ax=ax[i])
+            ax[i].set_title(titles[i]+ ' (VaR 5%)')
+
     plt.show()
 
 
