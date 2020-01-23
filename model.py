@@ -74,10 +74,10 @@ def simulate_hull_white(
             theta_rub = df_rub + rub_alpha*rate_rub + (sigma[0]**2)*(1-np.exp(-2*rub_alpha*passed_time))/2*rub_alpha
             theta_usd = df_usd + usd_alpha*rate_usd + (sigma[1]**2)*(1-np.exp(-2*usd_alpha*passed_time))/2*usd_alpha
 
-            results[i+1,0,sim_ix] = results[i,0,sim_ix] + (theta_rub - rub_alpha*results[i,0,sim_ix])*dt+stoch_tuple[0]
-            results[i+1,1,sim_ix] = results[i,1,sim_ix] + (theta_usd - usd_alpha*results[i,1,sim_ix])*dt+stoch_tuple[1]
-            results[i+1,2,sim_ix] = results[i,2,sim_ix] + k_fx*(rate_fx - np.log(results[i,2,sim_ix]))*dt+stoch_tuple[2]
-            
+            results[i+1,0,sim_ix] = (theta_rub - rub_alpha* results[:,0,sim_ix].sum())*dt+stoch_tuple[0]
+            results[i+1,1,sim_ix] = (theta_usd - usd_alpha* results[:,1,sim_ix].sum())*dt+stoch_tuple[1]
+            results[i+1,2,sim_ix] = k_fx*(rate_fx - np.log( results[:,2,sim_ix].sum()))*dt+stoch_tuple[2]
+
 
 
     return results
