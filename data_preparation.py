@@ -140,9 +140,9 @@ def get_decomp():
     usd_irs = usd_irs.sort_values(by='date').reset_index(drop=True)
 
     mrg = pd.merge(
-        usd_irs,
+        rub_irs,
         pd.merge(
-            rub_irs,
+            usd_irs,
             fx,
             left_on='date',
             right_on='date',
