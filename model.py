@@ -77,6 +77,7 @@ def simulate_hull_white(
             results[i+1,0,sim_ix] = (theta_rub - rub_alpha* results[:,0,sim_ix].sum())*dt+stoch_tuple[0]
             results[i+1,1,sim_ix] = (theta_usd - usd_alpha* results[:,1,sim_ix].sum())*dt+stoch_tuple[1]
             results[i+1,2,sim_ix] = k_fx*(rate_fx - np.log( results[:,2,sim_ix].sum()))*dt+stoch_tuple[2]
+            # results[i+1,2,sim_ix] = k_fx*(rate_fx - np.log( results[:,2,sim_ix].sum()))*dt+stoch_tuple[2]
 
 
 
@@ -90,19 +91,23 @@ def perform_simulations_basic_mode(sim_number=1000):
     return results
 
 def plot_results(result, show_diffs=True):
-    fig,ax = plt.subplots(1,3,figsize=(25,5))
-    if show_diffs:
-        titles=['Процентная ставка в рублях, приращения', "Процентная ставка в доларах, приращения", "Обменный курс, приращения"]
-        for i in range(3):
-            ax[i].plot(result[1:,i,:], alpha=0.1)
-            pd.DataFrame(result[1:,i,:].T).quantile(0.05).plot(ax=ax[i])
-            ax[i].set_title(titles[i]+ ' (VaR 5%)')
-    else:
-        titles=['Процентная ставка в рублях', "Процентная ставка в доларах", "Обменный курс"]
-        for i in range(3):
-            ax[i].plot(result[:,i,:].cumsum(axis=0), alpha=0.1)
-            pd.DataFrame(result[:,i,:].cumsum(axis=0).T).quantile(0.05).plot(ax=ax[i])
-            ax[i].set_title(titles[i]+ ' (VaR 5%)')
+    fig,ax = plt.subplots(2,3,figsize=(25,12))
+    # if show_diffs:
+    titles=['Процентная ставка в рублях, приращения', "Процентная ставка в доларах, приращения", "Обменный курс, приращения"]
+    for i in range(3):
+        ax[0][i].plot(result[1:,i,:], alpha=0.1)
+        ax[0][i].plot(np.quantile(result[1:,i,:], q=0.95, axis=1))
+
+
+
+        # pd.DataFrame(result[1:,i,:].T).quantile(0.95).plot(ax=ax[0][i])
+        ax[0][i].set_title(titles[i]+ f'\nVaR 95%\nmax = {round(np.quantile(result[1:,i,:], q=0.95, axis=1).max(), 4)}')
+    # else:
+    titles=['Процентная ставка в рублях', "Процентная ставка в доларах", "Обменный курс"]
+    for i in range(3):
+        ax[1][i].plot(result[:,i,:].cumsum(axis=0), alpha=0.1)
+        # pd.DataFrame(result[:,i,:].cumsum(axis=0).T).quantile(0.05).plot(ax=ax[1][i])
+        ax[1][i].set_title(titles[i])
 
     plt.show()
 
