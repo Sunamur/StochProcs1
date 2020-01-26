@@ -78,7 +78,8 @@ def get_rates():
     df_rub_usd_int=df_rub_usd_int.rename(columns={"maturity_usd_2weeks":"maturity"})
     df_rub_usd_int['maturity_frac'] = df_rub_usd_int['maturity']/54
 
-    s=0.0134
+    # s=0.0134
+    s=1/0.01442
 
     new_rates = pd.concat(
         [
@@ -88,7 +89,7 @@ def get_rates():
         axis=1)
 
     new_rates.fillna(0, inplace=True)
-    new_rates['fx_act']=(s*(1+new_rates['usd_diff'])/(1+new_rates['rub_diff']))
+    new_rates['fx_act']=(s*(1+new_rates['usd_act']*0.01)/(1+new_rates['rub_act']*0.01))
     new_rates['fx_diff'] =new_rates['fx_act'].diff()
 
 
@@ -125,8 +126,6 @@ def get_decomp():
     fx.loc[:,'date']=pd.to_datetime(fx['date'], format="%d/%m/%Y")
     fx=fx.sort_values(by='date').reset_index(drop=True)
 
-    fx['fx_rate'] = 1/fx['fx_rate']#считаем рубли в долларах
-
     rub_irs_raw = pd.read_excel('ROISfix history.xlsx')
     rub_irs=rub_irs_raw.loc[:,['Дата ставки','3M']]
     rub_irs.columns=['date','rub_rate']
@@ -154,7 +153,6 @@ def get_decomp():
         how='outer'
     )
 
-    print(mrg.columns)
     merged_interpolated_diff_corr = mrg.interpolate(method='linear').iloc[3:,1:].diff().iloc[1:].corr()
     decomposed = linalg.cholesky(merged_interpolated_diff_corr)
     return decomposed
