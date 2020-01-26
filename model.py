@@ -77,9 +77,6 @@ def simulate_hull_white(
             results[i+1,0,sim_ix] = (theta_rub - rub_alpha* results[:,0,sim_ix].sum())*dt+stoch_tuple[0]
             results[i+1,1,sim_ix] = (theta_usd - usd_alpha* results[:,1,sim_ix].sum())*dt+stoch_tuple[1]
             results[i+1,2,sim_ix] = k_fx*(rate_fx - np.log( results[:,2,sim_ix].sum()))*dt+stoch_tuple[2]
-            # results[i+1,2,sim_ix] = k_fx*(rate_fx - np.log( results[:,2,sim_ix].sum()))*dt+stoch_tuple[2]
-
-
 
     return results
 
@@ -97,7 +94,7 @@ def plot_results(result, show_diffs=True):
     for i in range(3):
         ax[0][i].plot(result[1:,i,:], alpha=0.1)
         ax[0][i].plot(np.quantile(result[1:,i,:], q=0.95, axis=1))
-
+        ax[0][i].set_xlabel('Шаг симуляции')
 
 
         # pd.DataFrame(result[1:,i,:].T).quantile(0.95).plot(ax=ax[0][i])
@@ -108,125 +105,37 @@ def plot_results(result, show_diffs=True):
         ax[1][i].plot(result[:,i,:].cumsum(axis=0), alpha=0.1)
         # pd.DataFrame(result[:,i,:].cumsum(axis=0).T).quantile(0.05).plot(ax=ax[1][i])
         ax[1][i].set_title(titles[i])
+        ax[1][i].set_xlabel('Шаг симуляции')
 
     plt.show()
 
 
-# sigma=[0.03, 0.0093, 0.11]
+def get_optimal_sim_num():
+    sim_nums = np.linspace(100,100000,51)
+    quantiles = {}
+    raw = {}
+    for sim in sim_nums:
+        local_result = simulate_hull_white(int(sim))
+        max_quantiles = np.quantile(local_result[1:,:,:],q=0.95,axis=2).max(axis=0)
+        quantiles[int(sim)]=max_quantiles
+        raw[int(sim)]=local_result
 
-# k_fx=0.015
-# dt=14/365
-
-# sim_number = 10
-# timesteps = 27
-
-# dict_of_rates={
-#     'usd':curve_usd,
-#     'rub':curve_rub,
-#     'fx':curve_fx,
-# }
-
-
-# rub_alpha=1
-# usd_alpha=1
-
-# dict_of_getters={
-#     'rub':lambda prev_state, rate_rub, stoch:  (rate_rub - rub_alpha*prev_state)*dt+stoch[0],
-#     'usd':lambda prev_state, rate_usd, stoch:  (rate_usd - usd_alpha*prev_state)*dt+stoch[1],
-#     'fx':lambda prev_state, rate_fx,  stoch:   k_fx*(rate_fx - np.log(prev_state))*dt+stoch[2],
-
-# }
-
-
-#id tuple:  rate_type, timestep, value
-
-
-# def calc_1_step(rate_type, timestep, value, stoch):
-#     if rate_type=='usd':
-#         getter = get_new_usd
-
-#     return getter(value, dict_of_rates[rate][timestep], stoch)
-
-
-
-"""
-mini_step = 2 weeks
-large_step - parameter (for now = 5 mini steps)
-num_steps - calculated parameter (how many large steps)
-simulations_number - parameter (for now = 1000)
-
-1. initialize rates.
-2. make sim_num simulations of large_step steps; save results
-3. bootstrap sim_num points from previous step, make simulations
-4. terminate when num_steps is reached
-
-"""
-
-
-make_stoch = stoch_wrapper(get_decomp())
-
-
-# def make_large_step(
-#     ministeps, 
-#     initial_values, 
-#     initial_timestep):
-#     history=[]
-#     stoch = make_stoch(ministeps)
-#     for instr_ix in range(3):
-#         instrument_kind = instruments[instr_ix]
-#         instrument_history=[(instrument_kind, initial_timestep, initial_values[instr_ix])]
-#         for i in range(ministeps):
-
-#             val_increment = dict_of_getters[instrument_kind](
-#                 instrument_history[-1][-1], 
-#                 dict_of_rates[instrument_kind][initial_timestep+i], 
-#                 stoch[i])
-#             instrument_history.append(
-#                 (instrument_kind,initial_timestep+i+1, instrument_history[-1][-1]+val_increment)
-#             )
-#         history.extend(instrument_history)
-
-#     return history
-
-
-# def dispatcher(sims=1000):
-#     curve_usd, curve_rub, curve_fx, init = get_rates()
-
-#     dict_of_rates={
-#         'usd':curve_usd,
-#         'rub':curve_rub,
-#         'fx':curve_fx,
-#     }
-#     usd_alpha=1
-#     rub_alpha=1
-
-
-#     cp_count=5
-#     ts_per_cp=5
+    df = pd.DataFrame(quantiles).T#.diff().abs().plot()
+    df.rename(columns={0:'RUB',1:'USD',2:'FX'}, inplace=True)
+    fig, axes=plt.subplots(ncols=2, figsize=(15,9))
+    df.plot(title='Значение 95% VaR приращений',ax=axes[0])
+    df.diff().abs().plot(title='Модуль дельты значения 95% VaR приращений',ax=axes[1])
+    axes[0].set_ylabel('Значение VaR')
+    axes[1].set_ylabel('Отличие VaR при повышении количества итераций')
+    axes[0].set_xlabel('Количество симуляций')
+    axes[1].set_xlabel('Количество симуляций')
     
-#     history=[[('usd', 0, init[0],'null'),('rub', 0, init[1],'null'),('fx', 0, init[2],'null'),]]
-#     for large_step in range(cp_count):
-#         local_history=[]
-#         # for instrument_kind in ['usd','rub','fx']:
+    plt.show()
+    return quantiles, raw
 
-#         """
-#         we urgently need to introduce simulation index, by which we will bootstrap start values
-#         we also need to add ix appending to make_large_step
-        
-#         """
-#         start_values = np.random.choice([x[2] for x in history[-1] if x[0]==instrument_kind], size=sims
-#             )
-#         for init_value in start_values:
-#             local_history.extend(
-#                 make_large_step(
-#                     instrument_kind,
-#                     ts_per_cp, 
-#                     init_value, 
-#                     large_step*ts_per_cp))
-#         history.append(local_history)
-#     return history
-# """
-# todo:
-# dispatcher for large steps
-#     must initialize, collect results on each checkpoint, bootstrap last results for new large step
-# """
+
+# import model
+# import pandas as pd
+# import numpy as np
+# import matplotlib.pyplot as plt
+# q, r = model.get_optimal_sim_num()
